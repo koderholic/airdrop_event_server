@@ -2,9 +2,9 @@ import request from "supertest";
 import server from "../src/server"; // Your Express server entry point
 import jwt from "jsonwebtoken"; // Import jsonwebtoken to create a valid token
 import { ethers } from "ethers";
-import { awsSdkPromiseResponse, awsSdkScanPromiseResponse } from "../__mocks__/aws-sdk/clients/dynamodb";
+import { awsSdkPromiseResponse, awsSdkScanPromiseResponse } from "./__mocks__/aws-sdk/clients/dynamodb";
 import { v4 as uuidv4 } from 'uuid';
-import { DocumentClient } from '../__mocks__/aws-sdk/clients/dynamodb';
+import { DocumentClient } from './__mocks__/aws-sdk/clients/dynamodb';
 import { TABLE_NAME } from "../src/database";
 import { AirdropService } from "../src/service";
 
@@ -291,7 +291,7 @@ describe("Airdrop API Tests (Mocked DB)", () => {
         }));
 
         const response = await request(server)
-            .get("/airdrop/1/status")
+            .get(`/airdrop/${eventId}/status`)
             .set("Cookie", authToken); // Use the valid JWT token
 
         expect(response.status).toBe(200);
