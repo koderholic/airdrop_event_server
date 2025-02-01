@@ -11,9 +11,12 @@ const updateFn = jest.fn().mockImplementation(() => ({ promise: awsSdkPromiseRes
 
 const scanFn = jest.fn().mockImplementation(() => ({ promise: awsSdkScanPromiseResponse }));
 
+const queryFn = jest.fn().mockImplementation(() => ({ promise: awsSdkScanPromiseResponse }));
+
 export class DocumentClient {
   get = getFn;
   put = putFn;
   update = updateFn;
   scan = scanFn;
+  query = queryFn;
 }
