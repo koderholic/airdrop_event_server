@@ -2,11 +2,12 @@ import express from 'express';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import cors from 'cors';
+import fs from 'fs';
+import https from 'https';
 import cookieParser from "cookie-parser";
 import AirdropRoutes from './routes/Airdrop';
 import AuthRoutes from './routes/Auth';
 import { errorHandler } from "./middleware/errorHandler";
-
 
 require('dotenv').config();
 
@@ -37,11 +38,15 @@ server.use('/airdrop', AirdropRoutes);
 server.use('/auth', AuthRoutes);
 server.use(errorHandler);
 
+const options = {
+  key: fs.readFileSync('key.pem'),
+  cert: fs.readFileSync('cert.pem')
+};
+
 const port = process.env.PORT || 5000;
-server.listen(port, () => {
-  /* eslint-disable no-console */
+https.createServer(options, server).listen(port, () => {
   console.log(`Listening: http://localhost:${port}`);
-  /* eslint-enable no-console */
 });
+
 
 export default server;

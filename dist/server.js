@@ -7,6 +7,8 @@ const express_1 = __importDefault(require("express"));
 const morgan_1 = __importDefault(require("morgan"));
 const helmet_1 = __importDefault(require("helmet"));
 const cors_1 = __importDefault(require("cors"));
+const fs_1 = __importDefault(require("fs"));
+const https_1 = __importDefault(require("https"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const Airdrop_1 = __importDefault(require("./routes/Airdrop"));
 const Auth_1 = __importDefault(require("./routes/Auth"));
@@ -35,11 +37,13 @@ server.use((0, cookie_parser_1.default)());
 server.use('/airdrop', Airdrop_1.default);
 server.use('/auth', Auth_1.default);
 server.use(errorHandler_1.errorHandler);
+const options = {
+    key: fs_1.default.readFileSync('key.pem'),
+    cert: fs_1.default.readFileSync('cert.pem')
+};
 const port = process.env.PORT || 5000;
-server.listen(port, () => {
-    /* eslint-disable no-console */
+https_1.default.createServer(options, server).listen(port, () => {
     console.log(`Listening: http://localhost:${port}`);
-    /* eslint-enable no-console */
 });
 exports.default = server;
 //# sourceMappingURL=server.js.map
