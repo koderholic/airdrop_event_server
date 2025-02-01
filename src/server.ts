@@ -38,7 +38,7 @@ server.use('/auth', AuthRoutes);
 server.use(errorHandler);
 
 const port = process.env.PORT || 5000;
-server.listen(port, () => {
+export const app = server.listen(port, () => {
   /* eslint-disable no-console */
   console.log(`Listening: http://localhost:${port}`);
   /* eslint-enable no-console */
