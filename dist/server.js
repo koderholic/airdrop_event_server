@@ -21,9 +21,6 @@ server.use((0, cors_1.default)({
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin)
             return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
-        }
         return callback(null, true);
     },
     credentials: true
