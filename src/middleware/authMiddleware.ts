@@ -25,7 +25,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
       }
 
       // Attach walletAddress to request for use in routes
-      (req as any).user = { walletAddress };
+      (req as any).user = walletAddress;
 
       next();
 };
