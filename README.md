@@ -25,11 +25,11 @@ The Airdrop Event API is a backend service built with Node.js, Express, and AWS 
   - Clears the authentication cookie, effectively logging out the user.
 
 ## Tech Stack
-`Backend`: Node.js, Express, TypeScript
-`Database`: AWS DynamoDB
-`Security`: EIP-712 Signed Messages, JWT Authentication
-`Validation`: Zod
-`Deployment`: AWS EC2 / AWS Amplify
+- Backend: `Node.js`, `Express`, `TypeScript`
+- Database: `AWS DynamoDB`
+- Security: `EIP-712 Signed Messages`, `JWT Authentication`
+- Validation: `Zod`
+- Deployment: `AWS EC2 / AWS Amplify`
 
 ## Future Considerations:
 - Add more unit tests (Jest/Mocha)
