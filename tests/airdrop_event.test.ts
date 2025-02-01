@@ -6,28 +6,64 @@ import { awsSdkPromiseResponse, awsSdkScanPromiseResponse } from "../__mocks__/a
 import { v4 as uuidv4 } from 'uuid';
 import { DocumentClient } from '../__mocks__/aws-sdk/clients/dynamodb';
 import { TABLE_NAME } from "../src/database";
+import { AirdropService } from "../src/service";
 
 let authToken: string;
+let signerAddress: string;
 const db = new DocumentClient();
 
+// Define the domain and types for EIP-712
+const domain = {
+    name: 'Avalanche Airdrop App',
+    version: "1",
+    chainId: 1, 
+};
+
+const types = {
+    SignIn: [
+        { name: "walletAddress", type: "address" },
+        { name: "timestamp", type: "uint256" }
+    ],
+};
+
+// Create a function to generate the EIP-712 signature
+const generateEIP712Signature = async (walletAddress: string, timestamp: number, privateKey: string) => {
+    const wallet = new ethers.Wallet(privateKey);
+    const message = {
+        timestamp,
+        walletAddress,
+    };
+
+    const signature = await wallet.signTypedData(domain, types, message);
+    return signature;
+};
 
 describe("Auth API Tests (Mocked DB)", () => {
-    it.skip("should login successfully", async () => {
+    it("should login successfully", async () => {
+        const timestamp = Math.floor(Date.now() / 1000);
+        
+        // Generate a random wallet
+        const wallet = ethers.Wallet.createRandom();
+        const walletAddress = wallet.address; // Get the corresponding wallet address
+        const randomPrivateKey = wallet.privateKey; // Get the private key
+
+        // Generate the EIP-712 signature
+        const signature = await generateEIP712Signature(walletAddress, timestamp, randomPrivateKey);
+
         const response = await request(server)
             .post("/auth/login")
             .send({
-                timestamp: Date.now(),
-                walletAddress: "0x1111111111111111111111111111111111111111",
-                signature: "mocked_signature", // Ensure this is a valid signature for testing
+                timestamp,
+                walletAddress, // Use the wallet address derived from the random private key
+                signature, // Use the generated EIP-712 signature
             });
 
         expect(response.status).toBe(200);
         expect(response.body.message).toBe("Login successful");
         authToken = response.headers['set-cookie'][0]; // Store the auth token from the response
-        console.log("Auth Token:", authToken); // Log the auth token for debugging
     });
 
-    it.skip("should logout successfully", async () => {
+    it("should logout successfully", async () => {
         const response = await request(server)
             .post("/auth/logout");
 
@@ -46,17 +82,14 @@ const generateRandomEthereumAddress = () => {
     return ethers.Wallet.createRandom().address;
 };
 
-beforeAll(() => {
-    // No need to call a separate mock function; the mock is already set up
-});
-
 describe("Airdrop API Tests (Mocked DB)", () => {
     beforeEach(() => {
         // Generate a valid JWT token before running the airdrop tests
-        authToken = `auth_token=${generateValidToken("0x1111111111111111111111111111111111111111")}; Path=/; HttpOnly`;
+        signerAddress = "0x1111111111111111111111111111111111111111";
+        authToken = `auth_token=${generateValidToken(signerAddress)}; Path=/; HttpOnly`;
     });
 
-    it.skip("should create an airdrop event successfully", async () => {
+    it("should create an airdrop event successfully", async () => {
         const participants = [
             generateRandomEthereumAddress(),
             generateRandomEthereumAddress(),
@@ -69,20 +102,41 @@ describe("Airdrop API Tests (Mocked DB)", () => {
             participants: participants, // Use generated addresses
         };
 
-        console.log("Request Body:", requestBody); // Log the request body
+
+        awsSdkScanPromiseResponse.mockReturnValueOnce(Promise.resolve({ Items: [] }));
 
         const response = await request(server)
             .post("/airdrop/create")
             .set("Cookie", authToken) // Use the valid JWT token
             .send(requestBody);
 
-        console.log("Create Airdrop Response:", response.body); // Log the response for debugging
+        expect(db.put).toHaveBeenCalledWith({
+            TableName: TABLE_NAME,
+            Item: {
+                eventID: expect.stringMatching(
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i // Regex for UUID
+                ),                
+                eventName: requestBody.eventName,
+                owner: signerAddress,  // Add this later
+                participants,
+                eligibleParticipants: participants,
+                winners: {},
+                eventStatus: "Open",
+                prizes: requestBody.prizes.map(prize => ({
+                    quantity: prize.quantity,
+                    availableQuantity: prize.quantity,
+                    amount: prize.amount,
+                    symbol: prize.symbol
+                }))
+            }
+            
+        });
         expect(response.status).toBe(200);
         expect(response.body.message).toBe("Airdrop created");
         expect(response.body.data.eventId).toBeDefined();
     });
 
-    it.skip("should not allow duplicate airdrop events", async () => {
+    it("should not allow duplicate airdrop events", async () => {
         // First, create the airdrop event
         const participants = [
             generateRandomEthereumAddress(),
@@ -118,47 +172,11 @@ describe("Airdrop API Tests (Mocked DB)", () => {
         expect(response.body.message).toBe("Airdrop already exists"); // Adjust this message based on your implementation
     });
 
-    it.skip("should draw one prize successfully", async () => {
+    it("should draw one prize successfully", async () => {
         // Setup: Create mock data for the airdrop event
         const participants = [
-            generateRandomEthereumAddress(),
-            generateRandomEthereumAddress(),
-            generateRandomEthereumAddress(),
-        ];
-
-        const eventId = uuidv4(); // Generate a unique ID for the event
-        const eventName = "Mock Airdrop";
-
-        // Mock the response for the get method to return the event data
-        awsSdkPromiseResponse.mockReturnValueOnce(Promise.resolve({
-            Item :{
-                eventID: eventId,
-                eventName: eventName,
-                prizes: [{ availableQuantity: 2, amount: 1, symbol: "AVAX" }],
-                eligibleParticipants: participants,
-                eventStatus: "Open",
-                winners: {}
-            },
-        }));
-
-        // Act: Draw one prize
-        const response = await request(server)
-            .post(`/airdrop/${eventId}/drawOne`)
-            .set("Cookie", authToken); // Use the valid JWT token
-
-        // Log the response for debugging
-        console.log("Draw One Prize Response:", response.body);
-
-        // Assert: Check the response status and message
-        expect(response.status).toBe(200);
-        expect(response.body.message).toBe("Prize drawn");
-    });
-
-    it("should draw all prizes successfully", async () => {
-        // Setup: Create mock data for the airdrop event
-        const participants = [
-            generateRandomEthereumAddress(),
-            generateRandomEthereumAddress(),
+            "0x23112813A6748e1a00a19cB6590aDc0e0b33AbFA",
+            "0x93e19580217E76669f3A364ae900b1e075226a85",
         ];
 
         const eventId = uuidv4(); // Generate a unique ID for the event
@@ -169,6 +187,58 @@ describe("Airdrop API Tests (Mocked DB)", () => {
             Item: {
                 eventID: eventId,
                 eventName: eventName,
+                owner: signerAddress,
+                prizes: [{ availableQuantity: 2, amount: 1, symbol: "AVAX" }],
+                eligibleParticipants: participants,
+                eventStatus: "Open",
+                winners: {}
+            },
+        }));
+
+        // Act: Draw All prizes
+        const response = await request(server)
+            .post(`/airdrop/${eventId}/drawOne`)
+            .set("Cookie", authToken); // Use the valid JWT token
+
+        // Check that the db.update was called with the correct parameters
+        expect(db.update).toHaveBeenCalledWith({
+            TableName: TABLE_NAME,
+            Key: { eventID: eventId }, // Use the eventID that was generated in the test
+            UpdateExpression: "set prizes = :prizes, winners = :winners, eventStatus = :status, eligibleParticipants = :eligibleParticipants",
+            ExpressionAttributeValues: {
+                ":prizes": [
+                    { availableQuantity: 0, amount: 1, symbol: "AVAX" }, // After drawing, available quantity should decrease
+                ],
+                ":winners":  {
+                    '0x23112813A6748e1a00a19cB6590aDc0e0b33AbFA': { amount: 1, symbol: "AVAX" },
+                    '0x93e19580217E76669f3A364ae900b1e075226a85': { amount: 1, symbol: "AVAX" }
+                }, 
+                ":status": "Closed", 
+                ":eligibleParticipants": [] 
+            }
+        });
+
+        // Assert: Check the response status and message
+        expect(response.status).toBe(200);
+        expect(response.body.message).toBe("Prize drawn");
+    });
+
+    it("should draw all prizes successfully", async () => {
+        // Setup: Create mock data for the airdrop event
+        const participants = [
+            "0x23112813A6748e1a00a19cB6590aDc0e0b33AbFA",
+            "0x93e19580217E76669f3A364ae900b1e075226a85",
+        ];
+
+        const eventId = uuidv4(); // Generate a unique ID for the event
+        const eventName = "Mock Airdrop";
+
+        // Mock the response for the get method to return the event data
+        awsSdkPromiseResponse.mockReturnValueOnce(Promise.resolve({
+            Item: {
+                eventID: eventId,
+                eventName: eventName,
+                owner: signerAddress,
                 prizes: [{ availableQuantity: 2, amount: 1, symbol: "AVAX" }],
                 eligibleParticipants: participants,
                 eventStatus: "Open",
@@ -190,14 +260,14 @@ describe("Airdrop API Tests (Mocked DB)", () => {
                 ":prizes": [
                     { availableQuantity: 0, amount: 1, symbol: "AVAX" }, // After drawing, available quantity should decrease
                 ],
-                ":winners": expect.any(Object), // This will be populated with the drawn winners
+                ":winners":  {
+                    '0x23112813A6748e1a00a19cB6590aDc0e0b33AbFA': { amount: 1, symbol: "AVAX" },
+                    '0x93e19580217E76669f3A364ae900b1e075226a85': { amount: 1, symbol: "AVAX" }
+                }, // This will be populated with the drawn winners
                 ":status": "Closed", // Assuming the status remains OPEN if there are still prizes left
                 ":eligibleParticipants": [] // This will be the remaining eligible participants
             }
         });
-
-        // Log the response for debugging
-        console.log("Draw All Prize Response:", response.body);
 
         // Assert: Check the response status and message
         expect(response.status).toBe(200);
@@ -205,14 +275,28 @@ describe("Airdrop API Tests (Mocked DB)", () => {
     });
 
 
-    it.skip("should get the status of an airdrop event", async () => {
+    it("should get the status of an airdrop event", async () => {
+
+        const eventId = uuidv4(); // Generate a unique ID for the event
+        const eventName = "Mock Airdrop";
+
+        awsSdkPromiseResponse.mockReturnValueOnce(Promise.resolve({
+            Item: {
+                eventID: eventId,
+                eventName: eventName,
+                prizes: [{ availableQuantity: 2, amount: 1, symbol: "AVAX" }],
+                eventStatus: "Open",
+                winners: {}
+            },
+        }));
+
         const response = await request(server)
             .get("/airdrop/1/status")
             .set("Cookie", authToken); // Use the valid JWT token
 
         expect(response.status).toBe(200);
         expect(response.body.message).toBe("Status fetched!");
-        expect(response.body.data).toHaveProperty("winners");
-        expect(response.body.data).toHaveProperty("status");
+        expect(JSON.stringify(response.body.data.winners)).toBe("{}");
+        expect(response.body.data.status).toBe("Open");
     });
 });
