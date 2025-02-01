@@ -1,5 +1,5 @@
 import request from "supertest";
-import server from "../src/server"; // Your Express server entry point
+import {app as server} from "../src/server"; 
 import jwt from "jsonwebtoken"; // Import jsonwebtoken to create a valid token
 import { ethers } from "ethers";
 import { awsSdkPromiseResponse, awsSdkScanPromiseResponse } from "./__mocks__/aws-sdk/clients/dynamodb";
@@ -300,3 +300,7 @@ describe("Airdrop API Tests (Mocked DB)", () => {
         expect(response.body.data.status).toBe("Open");
     });
 });
+
+afterAll((done) => {
+    server.close(done);
+  });
